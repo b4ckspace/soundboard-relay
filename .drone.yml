@@ -1,0 +1,13 @@
+kind: pipeline
+name: default
+
+steps:
+  - name: pypi
+    image: python:3-alpine
+    environment:
+      TWINE_PASSWORD:
+        from_secret: TWINE_PASSWORD
+    commands:
+      - pip install twine setuptools wheel
+      - python3 setup.py sdist bdist_wheel
+      - python3 -m twine upload -u bckspc dist/*
