@@ -82,14 +82,10 @@ def on_message_for_mpd(host, port):
 def main():
     """main"""
     parser = argparse.ArgumentParser()
-    parser.add_argument('--mqtt', dest='mqtt', action='store_const',
-                        default='mqtt.example.com')
-    parser.add_argument('--mqtt-port', dest='mqtt_port', action='store_const',
-                        type=int, default=1883)
-    parser.add_argument('--mpd', dest='mpd', action='store_const',
-                        default='mpd.example.com')
-    parser.add_argument('--mpd-port', dest='mpd_port', action='store_const',
-                        type=int, default=6600)
+    parser.add_argument('--mqtt', dest='mqtt', default='mqtt.example.com')
+    parser.add_argument('--mqtt-port', dest='mqtt_port', type=int, default=1883)
+    parser.add_argument('--mpd', dest='mpd', default='mpd.example.com')
+    parser.add_argument('--mpd-port', dest='mpd_port', type=int, default=6600)
     args = parser.parse_args()
     client = mqtt.Client()
     client.on_connect = on_connect
