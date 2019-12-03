@@ -5,20 +5,30 @@ soundboard-relay
 forwards mqtt messages to an mpd
 """
 
-import argparse
 from contextlib import contextmanager
+import argparse
+import logging
+import time
 
 import paho.mqtt.client as mqtt
 from mpd import MPDClient
 
 
+# pylint: disable=invalid-name
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+
 @contextmanager
-def log_exception():
+def log_exception(sleep=0):
     """Helper for exception handling."""
     try:
         yield
     except Exception as exc: # pylint: disable=broad-except
-        print("%s: %s" % (type(exc), exc))
+        logger.exception(exc)
+        if sleep:
+            logger.warning("sleeping %s sec", sleep)
+            time.sleep(sleep)
 
 
 class MPD:
@@ -29,12 +39,11 @@ class MPD:
         self.port = port
 
     def __enter__(self):
-        self.client.connect(self.host, self.port, 60)
+        logger.info("connecting to %s:%s", self.host, self.port)
+        self.client.connect(self.host, self.port, 5)
         return self
 
     def __exit__(self, etype, value, traceback):
-        if etype or value:
-            print("%s: %s" % (etype, value))
         with log_exception():
             self.client.disconnect()
         return True
@@ -53,29 +62,29 @@ def on_connect(client, userdata, flags, rc): # pylint: disable=unused-argument,i
     client.subscribe("psa/alarm")
     client.subscribe("sensor/door/frame")
     client.subscribe("sensor/door/bell")
-    print("listening")
+    print("subscribed to all topics")
 
 
 def on_message_for_mpd(host, port):
     """wrapper for mpd configurated MQTT message handler"""
     def on_message(client, userdata, msg): # pylint: disable=unused-argument
         """MQTT message handler"""
-        try:
+        with log_exception():
             with MPD(host, port) as mpd:
                 topic = msg.topic
                 payload = msg.payload.decode()
-                print(topic, payload)
+                soundfile = None
                 if topic == "psa/alarm":
-                    payload = "ALARM.ogg"
+                    soundfile = "ALARM.ogg"
                 elif topic == "sensor/door/frame" and payload == "open":
-                    payload = "door-louder.opus"
+                    soundfile = "door-louder.opus"
                 elif topic == "sensor/door/bell" and payload == "pressed":
-                    payload = "door-bell.ogg"
-                elif topic != "psa/sound":
-                    return
-                mpd.play(payload)
-        except Exception as exc: # pylint: disable=broad-except
-            print(exc)
+                    soundfile = "door-bell.ogg"
+                elif topic == "psa/sound":
+                    soundfile = payload
+                if soundfile:
+                    logger.info("playing %s", payload)
+                    mpd.play(soundfile)
     return on_message
 
 
@@ -89,9 +98,11 @@ def main():
     args = parser.parse_args()
     client = mqtt.Client()
     client.on_connect = on_connect
-    client.on_message = on_message_for_mpd(args.mqtt, args.mqtt_port)
-    client.connect(args.mqtt, args.mqtt_port, 60)
-    client.loop_forever()
+    client.on_message = on_message_for_mpd(args.mpd, args.mpd_port)
+    while True:
+        with log_exception(sleep=5):
+            client.connect(args.mqtt, args.mqtt_port, 60)
+            client.loop_forever()
 
 if __name__ == '__main__':
     main()
