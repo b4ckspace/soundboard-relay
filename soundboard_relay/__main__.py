@@ -15,8 +15,8 @@ from mpd import MPDClient
 
 
 # pylint: disable=invalid-name
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 
 @contextmanager
